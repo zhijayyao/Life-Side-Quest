@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Life Side Quest · 人生隐藏任务</title>
+    <style>
+        :root {
+            --misty-lavender: #E8E0F0;
+            --soft-rose: #F5E6E8;
+            --moonlight-blue: #E0E8F0;
+            --warm-gold: #F5E8D8;
+            --dream-white: #FAFAFA;
+            --deep-twilight: #2A2A3E;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: Georgia, 'Times New Roman', serif;
+            background: var(--deep-twilight);
+        }
+
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        .ui-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, var(--misty-lavender) 0%, var(--soft-rose) 50%, var(--moonlight-blue) 100%);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+
+        .loading-text {
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
+            color: var(--deep-twilight);
+            opacity: 0;
+            letter-spacing: 0.3em;
+            margin-bottom: 1rem;
+        }
+
+        .loading-bar {
+            width: 200px;
+            height: 2px;
+            background: rgba(42, 42, 62, 0.1);
+            border-radius: 1px;
+            overflow: hidden;
+        }
+
+        .loading-progress {
+            width: 0%;
+            height: 100%;
+            background: var(--deep-twilight);
+            transition: width 0.3s ease;
+        }
+
+        .task-card {
+            position: relative;
+            max-width: 520px;
+            width: calc(100% - 48px);
+            padding: 48px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 100%);
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+            border-radius: 32px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 32px rgba(42, 42, 62, 0.1), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+            pointer-events: auto;
+            opacity: 0;
+            transform: translateY(60px);
+            animation: cardFloat 10s ease-in-out infinite;
+        }
+
+        @keyframes cardFloat {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+        }
+
+        .card-header { text-align: center; margin-bottom: 32px; }
+
+        .card-title {
+            font-family: monospace;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: rgba(42, 42, 62, 0.6);
+            margin-bottom: 16px;
+        }
+
+        .rarity-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-family: monospace;
+            font-size: 0.7rem;
+            letter-spacing: 0.15em;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+
+        .rarity-badge.s-rank {
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            color: #fff;
+            box-shadow: 0 4px 16px rgba(255, 215, 0, 0.3);
+        }
+
+        .rarity-badge.a-rank {
+            background: linear-gradient(135deg, #C0C0C0 0%, #A8A8A8 100%);
+            color: #fff;
+            box-shadow: 0 4px 16px rgba(192, 192, 192, 0.3);
+        }
+
+        .rarity-badge.b-rank {
+            background: linear-gradient(135deg, #CD7F32 0%, #B87333 100%);
+            color: #fff;
+            box-shadow: 0 4px 16px rgba(205, 127, 50, 0.3);
+        }
+
+        .rarity-badge.c-rank {
+            background: rgba(255, 255, 255, 0.3);
+            color: var(--deep-twilight);
+        }
+
+        .task-category {
+            font-family: monospace;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: rgba(42, 42, 62, 0.6);
+            margin-top: 8px;
+        }
+
+        .task-content { text-align: center; margin-bottom: 32px; }
+
+        .task-image-container {
+            width: 100%;
+            height: 200px;
+            margin-bottom: 24px;
+            border-radius: 20px;
+            overflow: hidden;
+            position: relative;
+            background: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 100%);
+            box-shadow: 0 4px 16px rgba(42, 42, 62, 0.1);
+        }
+
+        .task-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 0.8s ease, transform 0.5s ease;
+            transform: scale(1.05);
+        }
+
+        .task-image.loaded {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .task-image-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(180deg, transparent 0%, transparent 50%, rgba(42, 42, 62, 0.2) 100%);
+            pointer-events: none;
+        }
+
+        .task-description {
+            font-size: clamp(1.5rem, 4vw, 2rem);
+            line-height: 1.6;
+            color: rgba(42, 42, 62, 0.9);
+            margin-bottom: 16px;
+        }
+
+        .task-hint {
+            font-size: 0.9rem;
+            color: rgba(42, 42, 62, 0.6);
+        }
+
+        .task-reward {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 24px;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+        }
+
+        .reward-label {
+            font-family: monospace;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: rgba(42, 42, 62, 0.6);
+        }
+
+        .reward-text {
+            font-size: 1rem;
+            color: rgba(42, 42, 62, 0.9);
+            font-style: italic;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            margin-top: 32px;
+        }
+
+        .glass-button {
+            position: relative;
+            padding: 16px 32px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.2) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            border-radius: 16px;
+            color: var(--deep-twilight);
+            font-size: 0.9rem;
+            cursor: pointer;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .glass-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(42, 42, 62, 0.15);
+        }
+
+        .glass-button:active {
+            transform: translateY(1px) scale(0.98);
+        }
+
+        .glass-button.primary {
+            background: linear-gradient(135deg, rgba(42, 42, 62, 0.9) 0%, rgba(42, 42, 62, 0.7) 100%);
+            color: var(--dream-white);
+        }
+
+        .date-display {
+            position: fixed;
+            bottom: 32px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: monospace;
+            font-size: 0.75rem;
+            letter-spacing: 0.15em;
+            color: rgba(42, 42, 62, 0.4);
+            z-index: 20;
+            opacity: 0;
+        }
+
+        .particle-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 15;
+            pointer-events: none;
+        }
+
+        .achievement-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            background: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 100%);
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-radius: 24px;
+            padding: 48px;
+            text-align: center;
+            z-index: 50;
+            opacity: 0;
+        }
+
+        .achievement-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 24px;
+            background: linear-gradient(135deg, var(--warm-gold) 0%, var(--soft-rose) 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+        }
+
+        .achievement-title {
+            font-size: 1.5rem;
+            color: var(--deep-twilight);
+            margin-bottom: 8px;
+        }
+
+        .achievement-desc {
+            font-size: 0.9rem;
+            color: rgba(42, 42, 62, 0.6);
+        }
+
+        @media (max-width: 768px) {
+            .task-card { padding: 32px 24px; }
+            .card-actions { flex-direction: column; }
+            .glass-button { width: 100%; }
+        }
+
+        @media (max-width: 480px) {
+            .task-card { padding: 24px 20px; border-radius: 24px; }
+            .task-description { font-size: 1.3rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-text" id="loadingText">LIFE SIDE QUEST</div>
+        <div class="loading-bar">
+            <div class="loading-progress" id="loadingProgress"></div>
+        </div>
+    </div>
+
+    <canvas id="bg-canvas"></canvas>
+
+    <div class="ui-layer">
+        <div class="task-card" id="taskCard">
+            <div class="card-header">
+                <div class="card-title">今日隐藏任务</div>
+                <div class="rarity-badge" id="rarityBadge">
+                    <span>✦</span>
+                    <span id="rarityText">S-RANK</span>
+                </div>
+                <div class="task-category" id="taskCategory">观察者</div>
+            </div>
+            <div class="task-content">
+                <div class="task-image-container" id="taskImageContainer">
+                    <img class="task-image" id="taskImage" alt="任务配图">
+                    <div class="task-image-overlay"></div>
+                </div>
+                <p class="task-description" id="taskDescription">观察今天第一阵风来自哪个方向</p>
+                <p class="task-hint" id="taskHint">不需要答案，只需要感受</p>
+                <div class="task-reward">
+                    <span class="reward-label">奖励</span>
+                    <span class="reward-text" id="taskReward">城市观察员</span>
+                </div>
+            </div>
+            <div class="card-actions">
+                <button class="glass-button" id="refreshBtn">换个任务</button>
+                <button class="glass-button primary" id="acceptBtn">接受任务</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="date-display" id="dateDisplay"></div>
+    <canvas class="particle-canvas" id="particleCanvas"></canvas>
+
+    <div class="achievement-popup" id="achievementPopup">
+        <div class="achievement-icon">🏆</div>
+        <h3 class="achievement-title">获得称号</h3>
+        <p class="achievement-desc" id="achievementDesc">城市观察员</p>
+    </div>
+
+    <script>
+        const QUESTS = [
+            { id: 1, category: "观察者", text: "观察今天第一阵风来自哪个方向", hint: "不需要答案，只需要感受", reward: "城市观察员", rarity: "S", image: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80" },
+            { id: 2, category: "观察者", text: "寻找一扇有故事感的窗户", hint: "每扇窗户都是一幅画", reward: "光线猎人", rarity: "A", image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&q=80" },
+            { id: 3, category: "观察者", text: "记录今天最温柔的光线", hint: "光会说话，你听到了吗", reward: "光线猎人", rarity: "A", image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=80" },
+            { id: 4, category: "观察者", text: "观察咖啡杯上的蒸汽变化", hint: "像云一样变幻莫测", reward: "时间收藏家", rarity: "B", image: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800&q=80" },
+            { id: 5, category: "观察者", text: "寻找一处你从未认真看过的角落", hint: "最美风景往往在无人问津处", reward: "城市观察员", rarity: "S", image: "https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=800&q=80" },
+            { id: 6, category: "观察者", text: "记录今天最安静的时刻", hint: "安静是生活的另一种声音", reward: "时间收藏家", rarity: "B", image: "https://images.unsplash.com/photo-1476820865390-c52aeebb9891?w=800&q=80" },
+            { id: 7, category: "观察者", text: "观察一个人的手部动作", hint: "手会说话，你读懂了吗", reward: "城市观察员", rarity: "C", image: "https://images.unsplash.com/photo-1516594798947-e65505dbb29d?w=800&q=80" },
+            { id: 8, category: "观察者", text: "寻找光影在墙上的舞蹈", hint: "阳光是最好的舞者", reward: "光线猎人", rarity: "A", image: "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=800&q=80" },
+            { id: 9, category: "观察者", text: "观察雨滴在窗户上的轨迹", hint: "每滴雨都有自己的故事", reward: "时间收藏家", rarity: "B", image: "https://images.unsplash.com/photo-1428592953211-077101b2021b?w=800&q=80" },
+            { id: 10, category: "观察者", text: "记录天空颜色的变化", hint: "天空每天都在换装", reward: "记忆记录者", rarity: "A", image: "https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?w=800&q=80" },
+            { id: 11, category: "探索者", text: "走一条从未走过的回家路", hint: "迷路也是一种探索", reward: "未知探索者", rarity: "A", image: "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=800&q=80" },
+            { id: 12, category: "探索者", text: "探索你所在城市的最老街道", hint: "每条老街都有故事", reward: "城市观察员", rarity: "S", image: "https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=800&q=80" },
+            { id: 13, category: "探索者", text: "寻找一家隐藏的独立书店", hint: "独立书店是城市的灵魂", reward: "未知探索者", rarity: "A", image: "https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=800&q=80" },
+            { id: 14, category: "探索者", text: "发现一个可以看日落的角落", hint: "日落是最浪漫的自然现象", reward: "光线猎人", rarity: "S", image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80" },
+            { id: 15, category: "探索者", text: "探索附近公园的每一个角落", hint: "公园里藏着自然的秘密", reward: "未知探索者", rarity: "B", image: "https://images.unsplash.com/photo-1519331379826-f10be5486c6f?w=800&q=80" },
+            { id: 16, category: "创造者", text: "拍下今天最柔软的光线", hint: "用镜头捕捉温柔", reward: "光线猎人", rarity: "A", image: "https://images.unsplash.com/photo-1493863641943-9b68992a8d07?w=800&q=80" },
+            { id: 17, category: "创造者", text: "给未来五年的自己写一句话", hint: "和未来的自己对话", reward: "时间收藏家", rarity: "S", image: "https://images.unsplash.com/photo-1517842645767-c639042777db?w=800&q=80" },
+            { id: 18, category: "创造者", text: "画下今天看到的最美事物", hint: "画笔是另一种眼睛", reward: "创意诗人", rarity: "A", image: "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=800&q=80" },
+            { id: 19, category: "创造者", text: "写一首关于今天的诗", hint: "生活本身就是诗", reward: "创意诗人", rarity: "A", image: "https://images.unsplash.com/photo-1455390582262-044cdead277a?w=800&q=80" },
+            { id: 20, category: "创造者", text: "拍摄一张未来会怀念的照片", hint: "为未来留下回忆", reward: "记忆记录者", rarity: "S", image: "https://images.unsplash.com/photo-1520520731457-9283dd14aa66?w=800&q=80" },
+            { id: 21, category: "思考者", text: "思考幸福对你意味着什么", hint: "幸福是最值得思考的问题", reward: "深夜思考者", rarity: "S", image: "https://images.unsplash.com/photo-1515023115689-589c33041d3c?w=800&q=80" },
+            { id: 22, category: "思考者", text: "想象十年后的自己会做什么", hint: "未来的自己是现在的你决定的", reward: "时间收藏家", rarity: "A", image: "https://images.unsplash.com/photo-1456324463128-7ff6903988d8?w=800&q=80" },
+            { id: 23, category: "思考者", text: "回忆一个改变你人生的瞬间", hint: "那些瞬间塑造了今天的你", reward: "记忆记录者", rarity: "A", image: "https://images.unsplash.com/photo-1499728603263-13726abce5fd?w=800&q=80" },
+            { id: 24, category: "思考者", text: "想象平行宇宙中的你会怎样", hint: "无限可能，无限想象", reward: "宇宙漫游者", rarity: "S", image: "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=800&q=80" },
+            { id: 25, category: "冒险家", text: "和陌生人微笑打招呼", hint: "微笑是通用的语言", reward: "冒险之心", rarity: "A", image: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=800&q=80" },
+            { id: 26, category: "冒险家", text: "尝试一家从未吃过的餐厅", hint: "味蕾也需要冒险", reward: "未知探索者", rarity: "B", image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&q=80" },
+            { id: 27, category: "冒险家", text: "一个人去看一场电影", hint: "独自享受也是一种能力", reward: "冒险之心", rarity: "A", image: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&q=80" },
+            { id: 28, category: "冒险家", text: "在雨中不带伞走一段路", hint: "淋雨也是一种浪漫", reward: "冒险之心", rarity: "A", image: "https://images.unsplash.com/photo-1519692933481-e162a57d6721?w=800&q=80" },
+            { id: 29, category: "冒险家", text: "报名一个从未尝试过的活动", hint: "走出舒适区的第一步", reward: "冒险之心", rarity: "S", image: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&q=80" },
+            { id: 30, category: "收藏家", text: "收藏一片有意义的树叶", hint: "每片叶子都是独一无二的", reward: "时间收藏家", rarity: "B", image: "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=800&q=80" },
+            { id: 31, category: "收藏家", text: "收藏一个有意义的声音", hint: "声音是记忆的钥匙", reward: "时间收藏家", rarity: "A", image: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800&q=80" },
+            { id: 32, category: "收藏家", text: "收藏今天的一个小确幸", hint: "小确幸汇成大幸福", reward: "时间收藏家", rarity: "C", image: "https://images.unsplash.com/photo-1513151233558-d860c5398176?w=800&q=80" },
+            { id: 33, category: "观察者", text: "寻找城市中的几何图形", hint: "建筑是凝固的几何诗", reward: "城市观察员", rarity: "B", image: "https://images.unsplash.com/photo-1486325212027-8081e485255e?w=800&q=80" },
+            { id: 34, category: "观察者", text: "寻找一处被遗忘的美丽", hint: "被遗忘的往往最珍贵", reward: "城市观察员", rarity: "A", image: "https://images.unsplash.com/photo-1493997181344-712f2f19d87a?w=800&q=80" },
+            { id: 35, category: "观察者", text: "寻找倒影中的世界", hint: "镜中世界更梦幻", reward: "记忆记录者", rarity: "B", image: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&q=80" },
+            { id: 36, category: "观察者", text: "记录城市的声音地图", hint: "闭上眼，聆听城市", reward: "时间收藏家", rarity: "A", image: "https://images.unsplash.com/photo-1514565131-fce0801e5785?w=800&q=80" },
+            { id: 37, category: "探索者", text: "寻找一座有故事的桥", hint: "桥连接两岸，也连接历史", reward: "城市观察员", rarity: "B", image: "https://images.unsplash.com/photo-1474021359467-1c24f5e29a7e?w=800&q=80" },
+            { id: 38, category: "探索者", text: "探索城市里的艺术涂鸦", hint: "涂鸦是城市的表情", reward: "创意诗人", rarity: "A", image: "https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?w=800&q=80" },
+            { id: 39, category: "探索者", text: "发现一个无人知晓的秘密基地", hint: "每个人都有秘密角落", reward: "未知探索者", rarity: "S", image: "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=800&q=80" },
+            { id: 40, category: "探索者", text: "探索你住所的楼顶", hint: "换个高度看世界", reward: "未知探索者", rarity: "A", image: "https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=800&q=80" },
+            { id: 41, category: "创造者", text: "收集今天看到的七种颜色", hint: "世界是调色盘", reward: "光线猎人", rarity: "B", image: "https://images.unsplash.com/photo-1525909002-1b05e0c869d8?w=800&q=80" },
+            { id: 42, category: "创造者", text: "用照片讲一个故事", hint: "每张照片都是一个故事", reward: "记忆记录者", rarity: "A", image: "https://images.unsplash.com/photo-1452587925148-ce544e77e70d?w=800&q=80" },
+            { id: 43, category: "创造者", text: "写一封给陌生人的信", hint: "文字可以温暖陌生人", reward: "创意诗人", rarity: "A", image: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800&q=80" },
+            { id: 44, category: "创造者", text: "用影子创作一幅画", hint: "影子是最有趣的画布", reward: "创意诗人", rarity: "B", image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=80" },
+            { id: 45, category: "思考者", text: "思考什么是真正重要的", hint: "在忙碌中不忘初心", reward: "深夜思考者", rarity: "A", image: "https://images.unsplash.com/photo-1507608616759-54f48f0af0ee?w=800&q=80" },
+            { id: 46, category: "思考者", text: "思考你想要的生活方式", hint: "知道自己想要什么很难，但很重要", reward: "深夜思考者", rarity: "A", image: "https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=800&q=80" },
+            { id: 47, category: "思考者", text: "想象一座属于自己的理想城市", hint: "设计自己的理想世界", reward: "创意诗人", rarity: "S", image: "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=800&q=80" },
+            { id: 48, category: "冒险家", text: "主动和一位邻居交谈", hint: "邻居是最近的有缘人", reward: "城市观察员", rarity: "B", image: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&q=80" },
+            { id: 49, category: "冒险家", text: "在城市里迷路十分钟", hint: "迷路中发现新风景", reward: "未知探索者", rarity: "A", image: "https://images.unsplash.com/photo-1502920917128-1aa500764cbd?w=800&q=80" },
+            { id: 50, category: "冒险家", text: "给一个久未联系的朋友发消息", hint: "联系是温暖的传递", reward: "时间收藏家", rarity: "A", image: "https://images.unsplash.com/photo-1516371535707-512a1e83bb9a?w=800&q=80" }
+        ];
+
+        class BackgroundRenderer {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.time = 0;
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+            }
+
+            resize() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+            }
+
+            lerp(a, b, t) { return a + (b - a) * t; }
+
+            draw() {
+                this.time += 0.0001;
+                const { width, height } = this.canvas;
+                const imageData = this.ctx.createImageData(width, height);
+                const data = imageData.data;
+
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        const i = (y * width + x) * 4;
+                        const nx = x / width;
+                        const ny = y / height;
+                        
+                        const angle1 = Math.sin(nx * 2 + this.time) * Math.cos(ny * 3 + this.time * 0.5);
+                        const angle2 = Math.cos(nx * 3 - this.time * 0.7) * Math.sin(ny * 2 + this.time * 0.3);
+                        const angle3 = Math.sin((nx + ny) * 2 + this.time * 0.8);
+                        const combined = (angle1 + angle2 + angle3) / 3;
+                        
+                        const colors = [
+                            { r: 232, g: 224, b: 240 },
+                            { r: 245, g: 230, b: 232 },
+                            { r: 224, g: 232, b: 240 },
+                            { r: 245, g: 232, b: 216 },
+                            { r: 220, g: 240, b: 230 },
+                            { r: 248, g: 235, b: 245 },
+                            { r: 230, g: 220, b: 245 },
+                            { r: 250, g: 240, b: 225 },
+                            { r: 240, g: 225, b: 235 },
+                            { r: 225, g: 235, b: 250 },
+                            { r: 245, g: 228, b: 228 },
+                            { r: 238, g: 245, b: 230 }
+                        ];
+                        
+                        const colorIndex1 = Math.floor((Math.sin(this.time * 0.5 + nx * 2) + 1) / 2 * (colors.length - 1));
+                        const colorIndex2 = (colorIndex1 + 1) % colors.length;
+                        const blend = (Math.sin(this.time * 0.5 + nx * 2) + 1) / 2 * (colors.length - 1) - colorIndex1;
+                        
+                        const c1 = colors[colorIndex1];
+                        const c2 = colors[colorIndex2];
+                        
+                        const r = Math.floor(this.lerp(c1.r, c2.r, blend) + combined * 15);
+                        const g = Math.floor(this.lerp(c1.g, c2.g, blend) + combined * 15);
+                        const b = Math.floor(this.lerp(c1.b, c2.b, blend) + combined * 15);
+                        
+                        data[i] = Math.min(255, Math.max(200, r));
+                        data[i + 1] = Math.min(255, Math.max(200, g));
+                        data[i + 2] = Math.min(255, Math.max(200, b));
+                        data[i + 3] = 255;
+                    }
+                }
+                this.ctx.putImageData(imageData, 0, 0);
+            }
+
+            animate() {
+                this.draw();
+                requestAnimationFrame(() => this.animate());
+            }
+        }
+
+        class ParticleSystem {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.particles = [];
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+            }
+
+            resize() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+            }
+
+            burst(x, y, count = 30) {
+                for (let i = 0; i < count; i++) {
+                    const angle = (Math.PI * 2 / count) * i;
+                    const speed = 2 + Math.random() * 3;
+                    this.particles.push({
+                        x, y,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed - 2,
+                        life: 1,
+                        decay: 0.008 + Math.random() * 0.005,
+                        size: 3 + Math.random() * 5,
+                        hue: Math.random() * 360
+                    });
+                }
+            }
+
+            animate() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    const p = this.particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.02;
+                    p.life -= p.decay;
+                    
+                    if (p.life <= 0) {
+                        this.particles.splice(i, 1);
+                        continue;
+                    }
+                    
+                    this.ctx.save();
+                    this.ctx.globalAlpha = p.life;
+                    const gradient = this.ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 2);
+                    gradient.addColorStop(0, `hsla(${p.hue}, 80%, 80%, 1)`);
+                    gradient.addColorStop(1, `hsla(${p.hue}, 80%, 60%, 0)`);
+                    this.ctx.fillStyle = gradient;
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, p.size * 2, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.restore();
+                }
+                requestAnimationFrame(() => this.animate());
+            }
+        }
+
+        class App {
+            constructor() {
+                this.currentQuest = null;
+                this.completedQuests = JSON.parse(localStorage.getItem('completedQuests') || '[]');
+                
+                this.loadingScreen = document.getElementById('loadingScreen');
+                this.loadingText = document.getElementById('loadingText');
+                this.loadingProgress = document.getElementById('loadingProgress');
+                this.taskCard = document.getElementById('taskCard');
+                this.taskImage = document.getElementById('taskImage');
+                this.taskImageContainer = document.getElementById('taskImageContainer');
+                this.rarityBadge = document.getElementById('rarityBadge');
+                this.rarityText = document.getElementById('rarityText');
+                this.taskCategory = document.getElementById('taskCategory');
+                this.taskDescription = document.getElementById('taskDescription');
+                this.taskHint = document.getElementById('taskHint');
+                this.taskReward = document.getElementById('taskReward');
+                this.refreshBtn = document.getElementById('refreshBtn');
+                this.acceptBtn = document.getElementById('acceptBtn');
+                this.dateDisplay = document.getElementById('dateDisplay');
+                this.achievementPopup = document.getElementById('achievementPopup');
+                this.achievementDesc = document.getElementById('achievementDesc');
+
+                this.initBackground();
+                this.initParticles();
+                this.initEventListeners();
+                this.initDateDisplay();
+                this.startIntro();
+            }
+
+            initBackground() {
+                const canvas = document.getElementById('bg-canvas');
+                this.bg = new BackgroundRenderer(canvas);
+                this.bg.animate();
+            }
+
+            initParticles() {
+                const canvas = document.getElementById('particleCanvas');
+                this.particles = new ParticleSystem(canvas);
+                this.particles.animate();
+            }
+
+            initEventListeners() {
+                this.refreshBtn.addEventListener('click', () => this.refreshQuest());
+                this.acceptBtn.addEventListener('click', () => this.completeQuest());
+            }
+
+            initDateDisplay() {
+                const now = new Date();
+                this.dateDisplay.textContent = now.toLocaleDateString('zh-CN', {
+                    year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
+                });
+            }
+
+            startIntro() {
+                let progress = 0;
+                const loadingInterval = setInterval(() => {
+                    progress += 5;
+                    this.loadingProgress.style.width = `${progress}%`;
+                    
+                    if (progress >= 100) {
+                        clearInterval(loadingInterval);
+                        this.loadingText.style.opacity = '1';
+                        setTimeout(() => {
+                            this.loadingScreen.style.opacity = '0';
+                            setTimeout(() => {
+                                this.loadingScreen.style.display = 'none';
+                                this.loadNewQuest();
+                                this.showUI();
+                            }, 1000);
+                        }, 500);
+                    }
+                }, 50);
+            }
+
+            loadNewQuest() {
+                const available = QUESTS.filter(q => !this.completedQuests.includes(q.id));
+                this.currentQuest = available.length ? available[Math.floor(Math.random() * available.length)] : QUESTS[Math.floor(Math.random() * QUESTS.length)];
+                this.updateQuestDisplay();
+            }
+
+            updateQuestDisplay() {
+                if (!this.currentQuest) return;
+                
+                this.rarityBadge.className = `rarity-badge ${this.currentQuest.rarity.toLowerCase()}-rank`;
+                this.rarityText.textContent = `${this.currentQuest.rarity}-RANK`;
+                this.taskCategory.textContent = this.currentQuest.category;
+                this.taskDescription.textContent = this.currentQuest.text;
+                this.taskHint.textContent = this.currentQuest.hint;
+                this.taskReward.textContent = this.currentQuest.reward;
+                
+                if (this.currentQuest.image) {
+                    this.taskImage.classList.remove('loaded');
+                    this.taskImage.src = this.currentQuest.image;
+                    this.taskImage.onload = () => {
+                        this.taskImage.classList.add('loaded');
+                    };
+                    this.taskImageContainer.style.display = 'block';
+                } else {
+                    this.taskImageContainer.style.display = 'none';
+                }
+            }
+
+            showUI() {
+                const els = [this.taskCard, this.dateDisplay];
+                els.forEach((el, i) => {
+                    setTimeout(() => {
+                        el.style.opacity = '1';
+                        el.style.transform = 'translateY(0)';
+                    }, i * 200);
+                });
+                
+                const cardEls = this.taskCard.querySelectorAll('.card-title, .rarity-badge, .task-category, .task-description, .task-hint, .task-reward, .glass-button');
+                cardEls.forEach((el, i) => {
+                    setTimeout(() => {
+                        el.style.opacity = '1';
+                        el.style.transform = 'translateY(0)';
+                    }, 600 + i * 100);
+                });
+            }
+
+            refreshQuest() {
+                this.taskCard.style.opacity = '0';
+                setTimeout(() => {
+                    this.loadNewQuest();
+                    this.taskCard.style.opacity = '1';
+                }, 300);
+            }
+
+            completeQuest() {
+                if (!this.currentQuest) return;
+                
+                this.completedQuests.push(this.currentQuest.id);
+                localStorage.setItem('completedQuests', JSON.stringify(this.completedQuests));
+                
+                const rect = this.taskCard.getBoundingClientRect();
+                this.particles.burst(rect.left + rect.width / 2, rect.top + rect.height / 2, 50);
+                
+                this.achievementDesc.textContent = this.currentQuest.reward;
+                this.achievementPopup.style.transition = 'all 0.5s ease';
+                this.achievementPopup.style.opacity = '1';
+                this.achievementPopup.style.transform = 'translate(-50%, -50%) scale(1)';
+                
+                setTimeout(() => {
+                    this.achievementPopup.style.opacity = '0';
+                    this.achievementPopup.style.transform = 'translate(-50%, -50%) scale(0)';
+                }, 2000);
+                
+                setTimeout(() => this.refreshQuest(), 2500);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => new App());
+    </script>
+</body>
+</html>
